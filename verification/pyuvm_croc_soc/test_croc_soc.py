@@ -1,8 +1,12 @@
 import cocotb
 from cocotb.triggers import RisingEdge
-from pyuvm import uvm_monitor, uvm_env, uvm_test, test
+from pyuvm import uvm_monitor, uvm_env, uvm_test, uvm_analysis_port, uvm_subscriber, test
 
 class CrocMonitor(uvm_monitor):
+
+    def build_phase(self):
+        super().build_phase()
+        self.ap = uvm_analysis_port("ap", self)
 
     async def run_phase(self):
         cocotb.log.info("CrocMonitor iniciado")
@@ -16,12 +20,37 @@ class CrocMonitor(uvm_monitor):
                 f"uart_tx={cocotb.top.uart_tx.value}, "
                 f"gpio_out={cocotb.top.gpio_out.value}"
             )
+
+            self.ap.write({
+                "ciclo": ciclo + 1,
+                "rst_n": int(cocotb.top.rst_n.value),
+                "uart_tx": int(cocotb.top.uart_tx.value),
+                "gpio_out": int(cocotb.top.gpio_out.value)
+            })
+
+class CrocScoreboard(uvm_subscriber):
+
+    def write(self, dados):
+        cocotb.log.info(
+            f"Scoreboard recebeu: "
+            f"ciclo={dados['ciclo']}, "
+            f"rst_n={dados['rst_n']}, "
+            f"uart_tx={dados['uart_tx']}, "
+            f"gpio_out={dados['gpio_out']}"
+        )
+
 class CrocEnv(uvm_env):
 
     def build_phase(self):
         super().build_phase()
 
         self.monitor = CrocMonitor("monitor", self)
+        self.scoreboard = CrocScoreboard("scoreboard", self)
+
+    def connect_phase(self):
+        super().connect_phase()
+
+        self.monitor.ap.connect(self.scoreboard.analysis_export)
 
 @test()
 class CrocTest(uvm_test):
@@ -36,7 +65,8 @@ class CrocTest(uvm_test):
 
         cocotb.log.info("CrocTest executando")
 
-        for _ in range(12):
+        for ciclo in range(12):
             await RisingEdge(cocotb.top.sys_clk)
 
         self.drop_objection()
+
