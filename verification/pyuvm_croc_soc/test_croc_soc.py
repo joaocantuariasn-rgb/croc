@@ -1,15 +1,42 @@
 import cocotb
-from cocotb.triggers import RisingEdge
+from cocotb.triggers import RisingEdge, FallingEdge, Timer
 from pyuvm import uvm_monitor, uvm_env, uvm_test, uvm_analysis_port, uvm_subscriber, test
+
+
+async def uart_read_byte():
+    uart_tx = cocotb.top.uart_tx
+
+    # Aguarda o início do start bit
+    await FallingEdge(uart_tx)
+
+    # Vai para o centro do start bit
+    await Timer(4, unit="us")
+
+    valor = 0
+
+    # Lê os 8 bits, LSB primeiro
+    for bit in range(8):
+        await Timer(8, unit="us")
+
+        if int(uart_tx.value):
+            valor |= (1 << bit)
+
+    # Aguarda o stop bit
+    await Timer(8, unit="us")
+
+    return valor
 
 class CrocMonitor(uvm_monitor):
 
     def build_phase(self):
         super().build_phase()
         self.ap = uvm_analysis_port("ap", self)
+        self.uart_ap = uvm_analysis_port("uart_ap", self)
 
     async def run_phase(self):
         cocotb.log.info("CrocMonitor iniciado")
+
+        cocotb.start_soon(self.monitor_uart())
 
         ciclo = 0
 
@@ -42,6 +69,38 @@ class CrocMonitor(uvm_monitor):
                     f"EOC detectado: core_status=0x{core_status:08X}"
                 )
                 break
+
+    async def monitor_uart(self):
+        mensagem = []
+
+        while True:
+            byte = await uart_read_byte()
+
+            if byte == 0x0A:  # '\n'
+                texto = bytes(mensagem).decode("ascii", errors="replace")
+
+                cocotb.log.info(
+                    f"pyUVM UART recebeu: {texto}"
+                )
+
+                self.uart_ap.write(texto)
+
+                mensagem.clear()
+            else:
+                mensagem.append(byte)
+
+class UartScoreboard(uvm_subscriber):
+
+    def build_phase(self):
+        super().build_phase()
+        self.mensagem_recebida = None
+
+    def write(self, mensagem):
+        self.mensagem_recebida = mensagem
+
+        cocotb.log.info(
+            f"UART Scoreboard recebeu: {mensagem}"
+        )
 
 class CrocScoreboard(uvm_subscriber):
 
@@ -96,11 +155,15 @@ class CrocEnv(uvm_env):
 
         self.monitor = CrocMonitor("monitor", self)
         self.scoreboard = CrocScoreboard("scoreboard", self)
+        self.uart_scoreboard = UartScoreboard("uart_scoreboard", self)
 
     def connect_phase(self):
         super().connect_phase()
 
         self.monitor.ap.connect(self.scoreboard.analysis_export)
+        self.monitor.uart_ap.connect(
+            self.uart_scoreboard.analysis_export
+        )
 
 @test()
 class CrocTest(uvm_test):
