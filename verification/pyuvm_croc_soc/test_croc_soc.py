@@ -1,21 +1,42 @@
 import cocotb
 from cocotb.triggers import RisingEdge
+from pyuvm import uvm_monitor, uvm_env, uvm_test, test
 
+class CrocMonitor(uvm_monitor):
 
-@cocotb.test()
-async def test_croc_soc_access(dut):
+    async def run_phase(self):
+        cocotb.log.info("CrocMonitor iniciado")
 
-    cocotb.log.info("Cocotb conectado ao Croc SoC")
+        for ciclo in range(10):
+            await RisingEdge(cocotb.top.sys_clk)
 
-    cocotb.log.info(f"rst_n    = {dut.rst_n.value}")
-    cocotb.log.info(f"sys_clk  = {dut.sys_clk.value}")
-    cocotb.log.info(f"uart_tx  = {dut.uart_tx.value}")
-    cocotb.log.info(f"gpio_out = {dut.gpio_out.value}")
+            cocotb.log.info(
+                f"Ciclo {ciclo + 1}: "
+                f"rst_n={cocotb.top.rst_n.value}, "
+                f"uart_tx={cocotb.top.uart_tx.value}, "
+                f"gpio_out={cocotb.top.gpio_out.value}"
+            )
+class CrocEnv(uvm_env):
 
-    # Aguarda alguns ciclos do clock real gerado pelo croc_vip
-    for _ in range(10):
-        await RisingEdge(dut.sys_clk)
+    def build_phase(self):
+        super().build_phase()
 
-    cocotb.log.info("10 ciclos do clock do Croc observados com sucesso")
+        self.monitor = CrocMonitor("monitor", self)
 
-    cocotb.log.info(f"rst_n após 10 ciclos = {dut.rst_n.value}")
+@test()
+class CrocTest(uvm_test):
+
+    def build_phase(self):
+        super().build_phase()
+
+        self.env = CrocEnv("env", self)
+
+    async def run_phase(self):
+        self.raise_objection()
+
+        cocotb.log.info("CrocTest executando")
+
+        for _ in range(12):
+            await RisingEdge(cocotb.top.sys_clk)
+
+        self.drop_objection()
