@@ -31,6 +31,13 @@ class CrocMonitor(uvm_monitor):
 class CrocScoreboard(uvm_subscriber):
 
     def write(self, dados):
+
+        if dados["rst_n"] == 0:
+            self.viu_reset_ativo = True
+
+        if dados["rst_n"] == 1:
+            self.viu_reset_liberado = True
+
         cocotb.log.info(
             f"Scoreboard recebeu: "
             f"ciclo={dados['ciclo']}, "
@@ -38,6 +45,25 @@ class CrocScoreboard(uvm_subscriber):
             f"uart_tx={dados['uart_tx']}, "
             f"gpio_out={dados['gpio_out']}"
         )
+
+    def check_phase(self):
+        super().check_phase()
+
+        assert self.viu_reset_ativo, \
+            "ERRO: rst_n nunca ficou em 0"
+
+        assert self.viu_reset_liberado, \
+            "ERRO: rst_n nunca foi liberado para 1"
+
+        cocotb.log.info(
+            "PASSOU: reset do Croc foi ativado e depois liberado"
+        )
+
+    def build_phase(self):
+        super().build_phase()
+
+        self.viu_reset_ativo = False
+        self.viu_reset_liberado = False
 
 class CrocEnv(uvm_env):
 
