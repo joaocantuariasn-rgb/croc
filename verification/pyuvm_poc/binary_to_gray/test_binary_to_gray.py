@@ -6,7 +6,6 @@ from pyuvm import (
     uvm_env,
     uvm_driver,
     uvm_monitor,
-    uvm_subscriber,
     uvm_sequence,
     uvm_sequence_item,
     uvm_sequencer,
@@ -16,6 +15,7 @@ from pyuvm import (
 
 from reference_model import binary_to_gray_reference
 from coverage_model import BinaryToGrayCoverage
+from reusable_env.env.base_scoreboard import BaseScoreboard
 
 class BinaryToGrayItem(uvm_sequence_item):
     def __init__(self, name, value=0):
@@ -80,20 +80,16 @@ class BinaryToGrayMonitor(uvm_monitor):
             self.coverage.report()
         )
 
-class BinaryToGrayScoreboard(uvm_subscriber):
+class BinaryToGrayScoreboard(BaseScoreboard):
     def write(self, data):
         value, result = data
 
         expected = binary_to_gray_reference(value)
-        
-        assert result == expected, (
-            f"ERRO: A={value:04b}, "
-            f"Z={result:04b}, "
-            f"esperado={expected:04b}"
-        )
 
-        self.logger.info(
-            f"PASSOU: A={value:04b} -> Z={result:04b}"
+        self.compare(
+            actual=result,
+            expected=expected,
+            context=f"A={value:04b}"
         )
 
 
