@@ -14,6 +14,8 @@ from pyuvm import (
     test,
 )
 
+from reference_model import binary_to_gray_reference
+from coverage_model import BinaryToGrayCoverage
 
 class BinaryToGrayItem(uvm_sequence_item):
     def __init__(self, name, value=0):
@@ -56,7 +58,9 @@ class BinaryToGrayDriver(uvm_driver):
 class BinaryToGrayMonitor(uvm_monitor):
     def build_phase(self):
         super().build_phase()
+
         self.ap = uvm_analysis_port("ap", self)
+        self.coverage = BinaryToGrayCoverage(width=4)
 
     async def run_phase(self):
         while True:
@@ -65,15 +69,23 @@ class BinaryToGrayMonitor(uvm_monitor):
             value = int(cocotb.top.A.value)
             result = int(cocotb.top.Z.value)
 
+            self.coverage.sample(value)
+
             self.ap.write((value, result))
 
+    def report_phase(self):
+        super().report_phase()
+
+        self.logger.info(
+            self.coverage.report()
+        )
 
 class BinaryToGrayScoreboard(uvm_subscriber):
     def write(self, data):
         value, result = data
 
-        expected = value ^ (value >> 1)
-
+        expected = binary_to_gray_reference(value)
+        
         assert result == expected, (
             f"ERRO: A={value:04b}, "
             f"Z={result:04b}, "
