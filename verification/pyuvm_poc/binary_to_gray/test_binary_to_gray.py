@@ -23,7 +23,7 @@ class BinaryToGrayItem(uvm_sequence_item):
         self.value = value
 
 
-class BinaryToGraySequence(uvm_sequence):
+class BinaryToGrayBasicSequence(uvm_sequence):
     async def body(self):
         values = [
             0b0000,
@@ -37,6 +37,15 @@ class BinaryToGraySequence(uvm_sequence):
         ]
 
         for value in values:
+            item = BinaryToGrayItem("item", value)
+
+            await self.start_item(item)
+            await self.finish_item(item)
+
+
+class BinaryToGrayFullSequence(uvm_sequence):
+    async def body(self):
+        for value in range(16):
             item = BinaryToGrayItem("item", value)
 
             await self.start_item(item)
@@ -123,9 +132,9 @@ class BinaryToGrayTest(uvm_test):
     async def run_phase(self):
         self.raise_objection()
 
-        sequence = BinaryToGraySequence("sequence")
+        sequence = BinaryToGrayFullSequence("full_sequence")
         await sequence.start(self.env.sequencer)
 
-        await Timer(2, unit="ns")
+        await Timer(1, unit="ns")
 
         self.drop_objection()

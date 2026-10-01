@@ -80,7 +80,10 @@ Each verification item should define:
 
 | ID | Feature | Stimulus | Reference | Check | Coverage Goal | Status |
 |----|---------|----------|-----------|-------|---------------|--------|
-| TBD | TBD | TBD | TBD | TBD | TBD | Not defined |
+| VP-01 | Binary-to-Gray conversion | Selected 4-bit input values | Python reference model | Scoreboard comparison | Selected input values | PASS |
+| VP-02 | Minimum input value | 0000 | Python reference model | Scoreboard comparison | Minimum value exercised | PASS |
+| VP-03 | Maximum input value | 1111 | Python reference model | Scoreboard comparison | Maximum value exercised | PASS |
+| VP-04 | Complete input space | 0000 to 1111 | Python reference model | Scoreboard comparison | 100% of input values | PASS |
 
 The verification matrix will be completed when the target RTL and its
 requirements are defined.
